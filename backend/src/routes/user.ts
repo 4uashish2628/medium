@@ -5,6 +5,7 @@ import { PrismaClient } from "../../generated/prisma";
 import { withAccelerate } from '@prisma/extension-accelerate';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { sign } from 'hono/jwt';
+import { signinInput, signupInput } from "@ashish2628/common";
 
 export const userRouter = new Hono<({
 	Bindings: {
@@ -16,17 +17,26 @@ export const userRouter = new Hono<({
 
 
 userRouter.post('/signup', async (c) => {
+	const body = await c.req.json();
+	const parsed = signupInput.safeParse(body);
+	if(!parsed.success){
+		console.log(parsed.error)
+		c.status(411);
+		return c.json({
+			message : "input does not validate" ,
+			error: parsed.error.format()
+		})
+	}
 	const prisma = new PrismaClient({
 		adapter: new PrismaPg({
 			connectionString: c.env.DATABASE_URL,
 		}),
 	}).$extends(withAccelerate());
-	const body = await c.req.json();
 	try {
 		const user = await prisma.user.create({
 			data: {
 				email: body.email,
-				password: body.password
+				password: body.password,
 			}
 		});
 		const token = await sign({ id: user.id }, c.env.JWT_SECRET);
@@ -39,12 +49,19 @@ userRouter.post('/signup', async (c) => {
 })
 
 userRouter.post('/signin', async (c) => {
+	const body = await c.req.json();
+	const {success} = signinInput.safeParse(body);
+	if(!success){
+		c.status(411);
+		return c.json({
+			message : "input does not validate"
+		})
+	}
 	const prisma = new PrismaClient({
 		adapter: new PrismaPg({
 			connectionString: c.env.DATABASE_URL,
 		}),
 	}).$extends(withAccelerate());
-	const body = await c.req.json();
 	const user = await prisma.user.findUnique({
 		where: {
 			email: body.email,

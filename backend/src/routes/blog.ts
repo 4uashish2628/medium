@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { PrismaClient } from "../../generated/prisma";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { verify } from "hono/jwt";
+import { createPostInput, updatePostInput } from "@ashish2628/common";
 
 export const blogRouter = new Hono<{
     Bindings: {
@@ -32,12 +33,19 @@ blogRouter.use('/*', async (c, next) => {
 })
 
 blogRouter.post('/', async (c) => {
+    const body = await c.req.json();
+    const {success} = createPostInput.safeParse(body);
+        if(!success){
+            c.status(411);
+            return c.json({
+                message : "input does not validate"
+            })
+        }
     const prisma = new PrismaClient({
         adapter: new PrismaPg({
             connectionString: c.env.DATABASE_URL,
         }),
     }).$extends(withAccelerate());
-    const body = await c.req.json();
     const userId = c.get("userId");
     try {
         const blog = prisma.post.create({
@@ -59,6 +67,13 @@ blogRouter.post('/', async (c) => {
 
 blogRouter.put('/', async (c) => {
     const body = await c.req.json();
+    const {success} = updatePostInput.safeParse(body);
+        if(!success){
+            c.status(411);
+            return c.json({
+                message : "input does not validate"
+            })
+        }
     const prisma = new PrismaClient({
         adapter: new PrismaPg({
             connectionString: c.env.DATABASE_URL,

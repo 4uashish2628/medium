@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { userRouter } from './routes/user';
 import { blogRouter } from './routes/blog';
-//import { PrismaClient } from './generated/prisma/client';
 
 const app = new Hono<{
 	Bindings: {
