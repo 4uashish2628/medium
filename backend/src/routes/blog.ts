@@ -1,4 +1,3 @@
-import { PrismaPg } from "@prisma/adapter-pg";
 import { Hono } from "hono";
 import { PrismaClient } from "../../generated/prisma";
 import { withAccelerate } from "@prisma/extension-accelerate";
@@ -12,6 +11,12 @@ export const blogRouter = new Hono<{
     }
     Variables: { userId: string; }
 }>();
+
+export const getPrisma = (accelerateUrl: string) => {
+  return new PrismaClient({
+    accelerateUrl,
+  }).$extends(withAccelerate());
+};
 
 blogRouter.use('/*', async (c, next) => {
     try {
@@ -41,11 +46,7 @@ blogRouter.post('/', async (c) => {
                 message : "input does not validate"
             })
         }
-    const prisma = new PrismaClient({
-        adapter: new PrismaPg({
-            connectionString: c.env.DATABASE_URL,
-        }),
-    }).$extends(withAccelerate());
+    const prisma = getPrisma(c.env.DATABASE_URL);
     const userId = c.get("userId");
     try {
         const blog = prisma.post.create({
@@ -61,7 +62,7 @@ blogRouter.post('/', async (c) => {
     }
     catch (e) {
         c.status(410);
-        c.json({ message: "fucked up" })
+        c.json({ message: "error occured"})
     }
 })
 
@@ -74,11 +75,7 @@ blogRouter.put('/', async (c) => {
                 message : "input does not validate"
             })
         }
-    const prisma = new PrismaClient({
-        adapter: new PrismaPg({
-            connectionString: c.env.DATABASE_URL,
-        }),
-    }).$extends(withAccelerate());
+    const prisma = getPrisma(c.env.DATABASE_URL);
     const blog = await prisma.post.update({
         where: {
             id: body.id
@@ -92,22 +89,14 @@ blogRouter.put('/', async (c) => {
 })
 
 blogRouter.get('/bulk', async (c) => {
-    const prisma = new PrismaClient({
-        adapter: new PrismaPg({
-            connectionString: c.env.DATABASE_URL,
-        }),
-    }).$extends(withAccelerate());
+    const prisma =getPrisma(c.env.DATABASE_URL);
     const blogs = await prisma.post.findMany();
     return c.json({ blogs });
 })
 
 blogRouter.get('/:id', async (c) => {
     const id = c.req.param('id');
-    const prisma = new PrismaClient({
-        adapter: new PrismaPg({
-            connectionString: c.env.DATABASE_URL,
-        }),
-    }).$extends(withAccelerate());
+    const prisma = getPrisma(c.env.DATABASE_URL);
     try {
         const blog = await prisma.post.findUnique({
             where: {
