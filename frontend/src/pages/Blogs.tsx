@@ -1,14 +1,18 @@
 import { BlogCard } from "../components/BlogCard";
 import { Appbar } from "../components/Appbar";
 import { useBlogs } from "../hooks";
+import { BlogCardSkeleton } from "../components/BlogcardSkeleton";
 
 export const Blogs = () => {
     const { loading, blogs } = useBlogs();
 
     if (loading) {
         return <div>
-            loading...
-        </div>
+            <Appbar />
+                {[1, 2, 3, 4, 5].map((i) => (
+            <BlogCardSkeleton key={i} />
+        ))}
+    </div>
     }
 
     return <div>
