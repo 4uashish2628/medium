@@ -10,7 +10,7 @@ export const Auth = ({type} : {type : "signin" | "signup"}) => {
         name: "",
         email: "",
         password: ""
-    })
+    }) 
 
     async function sendreq(){
         try{
