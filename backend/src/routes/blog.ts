@@ -3,6 +3,7 @@ import { PrismaClient } from "../../generated/prisma";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { verify } from "hono/jwt";
 import { createPostInput, updatePostInput } from "@ashish2628/common";
+import { isTokenHeader } from "hono/utils/jwt/jwt";
 
 export const blogRouter = new Hono<{
     Bindings: {
@@ -13,15 +14,16 @@ export const blogRouter = new Hono<{
 }>();
 
 export const getPrisma = (accelerateUrl: string) => {
-  return new PrismaClient({
-    accelerateUrl,
-  }).$extends(withAccelerate());
+    return new PrismaClient({
+        accelerateUrl,
+    }).$extends(withAccelerate());
 };
 
 blogRouter.use('/*', async (c, next) => {
     try {
         const authHeader = await c.req.header("Authorization") || "";
-        const user = await verify(authHeader, c.env.JWT_SECRET, "HS256")
+        const token = authHeader.split(" ")[1];
+        const user = await verify(token, c.env.JWT_SECRET, "HS256")
         if (user) {
             c.set("userId", String(user.id));
             await next();
@@ -39,21 +41,26 @@ blogRouter.use('/*', async (c, next) => {
 
 blogRouter.post('/', async (c) => {
     const body = await c.req.json();
-    const {success} = createPostInput.safeParse(body);
-        if(!success){
-            c.status(411);
-            return c.json({
-                message : "input does not validate"
-            })
-        }
+    const { success } = createPostInput.safeParse(body);
+    if (!success) {
+        c.status(411);
+        return c.json({
+            message: "input does not validate"
+        })
+    }
     const prisma = getPrisma(c.env.DATABASE_URL);
     const userId = c.get("userId");
     try {
+        const date = new Date();
+        date.setHours(0, 0, 0, 0);
+
         const blog = prisma.post.create({
             data: {
                 title: body.title,
                 content: body.content,
-                authorId: userId
+                authorId: userId,
+                published : true,
+                publishedAt : date,
             }
         })
         return c.json({
@@ -62,19 +69,19 @@ blogRouter.post('/', async (c) => {
     }
     catch (e) {
         c.status(410);
-        c.json({ message: "error occured"})
+        c.json({ message: "error occured" })
     }
 })
 
 blogRouter.put('/', async (c) => {
     const body = await c.req.json();
-    const {success} = updatePostInput.safeParse(body);
-        if(!success){
-            c.status(411);
-            return c.json({
-                message : "input does not validate"
-            })
-        }
+    const { success } = updatePostInput.safeParse(body);
+    if (!success) {
+        c.status(411);
+        return c.json({
+            message: "input does not validate"
+        })
+    }
     const prisma = getPrisma(c.env.DATABASE_URL);
     const blog = await prisma.post.update({
         where: {
@@ -89,8 +96,16 @@ blogRouter.put('/', async (c) => {
 })
 
 blogRouter.get('/bulk', async (c) => {
-    const prisma =getPrisma(c.env.DATABASE_URL);
-    const blogs = await prisma.post.findMany();
+    const prisma = getPrisma(c.env.DATABASE_URL);
+    const blogs = await prisma.post.findMany({
+        include : {
+            author : {
+                select : {
+                    name : true,
+                }
+            }
+        }
+    });
     return c.json({ blogs });
 })
 
@@ -99,11 +114,19 @@ blogRouter.get('/:id', async (c) => {
     const prisma = getPrisma(c.env.DATABASE_URL);
     try {
         const blog = await prisma.post.findUnique({
-            where: {
-                id: id
-            }
-        })
-        if (!blog) return c.text('not found');
+            where: { id },
+            include: {
+                author: {
+                    select: {
+                        name: true,
+                    },
+                },
+            },
+        });
+        if (!blog) {
+            c.status(404)
+            return c.text('Blog not found');
+        }
         return c.json({ blog });
     } catch (e) {
         c.status(411);

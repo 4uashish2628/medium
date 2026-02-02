@@ -12,32 +12,43 @@ export const userRouter = new Hono<({
 })>();
 
 export const getPrisma = (accelerateUrl: string) => {
-  return new PrismaClient({
-    accelerateUrl,
-  }).$extends(withAccelerate());
+	return new PrismaClient({
+		accelerateUrl,
+	}).$extends(withAccelerate());
 };
 
 userRouter.post('/signup', async (c) => {
 	const body = await c.req.json();
 	const parsed = signupInput.safeParse(body);
-	if(!parsed.success){
+	if (!parsed.success) {
 		console.log(parsed.error)
 		c.status(411);
 		return c.json({
-			message : "input does not validate" ,
+			message: "input does not validate",
 			error: parsed.error.format()
 		})
 	}
 	const prisma = getPrisma(c.env.DATABASE_URL);
 	try {
+		const userexist = await prisma.user.findUnique({
+			where: {
+				email: body.email,
+			},
+		})
+		if (userexist) {
+      		c.status(409);
+      		return c.json({
+       		message: "User with this email already exists",
+      	});
+    }
 		const user = await prisma.user.create({
 			data: {
 				email: body.email,
 				password: body.password,
-				name : body.username,
+				name: body.name,
 			}
 		});
-		const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
+		const jwt = await sign({ id: user.id , name : user.name }, c.env.JWT_SECRET);
 		return c.json({
 			token: jwt
 		})
@@ -48,11 +59,11 @@ userRouter.post('/signup', async (c) => {
 
 userRouter.post('/signin', async (c) => {
 	const body = await c.req.json();
-	const {success} = signinInput.safeParse(body);
-	if(!success){
+	const { success } = signinInput.safeParse(body);
+	if (!success) {
 		c.status(411);
 		return c.json({
-			message : "input does not validate"
+			message: "input does not validate"
 		})
 	}
 	const prisma = getPrisma(c.env.DATABASE_URL);
@@ -66,7 +77,7 @@ userRouter.post('/signin', async (c) => {
 		c.status(403);
 		return c.json({ error: "user not found" })
 	}
-	const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
+	const jwt = await sign({ id: user.id , name : user.name }, c.env.JWT_SECRET);
 	return c.json({ token: jwt });
 })
 
