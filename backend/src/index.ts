@@ -9,7 +9,9 @@ const app = new Hono<{
 		JWT_SECRET: string,
 	},
 }>();
-app.use( "/*",cors())
+app.use(cors({
+	origin : 'https://medium-sandy-ten.vercel.app'
+}))
 
 app.route('/api/v1/user' , userRouter);
 app.route('/api/v1/blog' , blogRouter);
